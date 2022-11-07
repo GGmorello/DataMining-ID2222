@@ -1,8 +1,7 @@
-ThisBuild / version := "0.1.0-SNAPSHOT"
+name := "Simple Project"
 
-ThisBuild / scalaVersion := "3.2.1"
+version := "1.0"
 
-lazy val root = (project in file("."))
-  .settings(
-    name := "Assignment1"
-  )
+scalaVersion := "2.13.10"
+
+libraryDependencies += "org.apache.spark" %% "spark-sql" % "3.3.1"
