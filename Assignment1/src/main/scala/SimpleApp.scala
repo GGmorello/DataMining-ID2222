@@ -24,9 +24,9 @@ object Main {
 
     val similarities = sims.computeJaccard(allShingles)
 
-    println(similarities)
+    val hash = new MinHashing()
 
-
+    val minHashed = hash.buildMinHash(allShingles)
 
 
     spark.stop()
@@ -43,7 +43,7 @@ class Shingling {
     return rddWhole.map({ case (filePath, fileContent) => {
         val set = fileContent.replace(" ", "")
           .sliding(shingleSize)
-          .map(s1 => MurmurHash3.stringHash(s1)) // [(hash, 1), (hash, 1)]
+          .map(s1 => MurmurHash3.stringHash(s1)) // [(hash), (hash)]
           .toSet
         (filePath, set)
     }})
@@ -57,7 +57,7 @@ class CompareSets {
     val arr = data.collect()
     val sol = ArrayBuffer[(String, String, Double)]()
     for (i <- Range(0, arr.size)) {
-      for (j <- Range(i, arr.size)) {
+      for (j <- Range(i+1, arr.size)) {
         sol += ((arr(i)._1, arr(j)._1, compare(arr(i)._2, arr(j)._2)))
       }
     }
@@ -71,4 +71,42 @@ class CompareSets {
     return sol
   }
 
+}
+
+class MinHashing {
+
+  def createCharMatrix(shingles: RDD[(String, Set[Int])]): Array[Array[Int]]= {
+    var i = 0
+    var j = 0
+    val arr = shingles.collect()
+    val shingleSet = ArrayBuffer[Int]()
+
+    for (sh <- arr){
+      shingleSet ++= sh._2.toArray
+    }
+
+    val allShingles = shingleSet.distinct
+
+    val matrix = Array.ofDim[Int](shingleSet.size, arr.size)
+
+    for (sh <- allShingles) {
+
+      i += 1
+
+      for (file <- arr){
+        j += 1
+
+        if (file._2 contains sh) matrix(i)(j) = 1
+
+      }
+      j = 0
+    }
+
+    return matrix
+  }
+
+  def buildMinHash( shingles: RDD[(String, Set[Int])] ) = {
+    val matrix = createCharMatrix(shingles)
+    print(matrix)
+  }
 }
