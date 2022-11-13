@@ -2,10 +2,12 @@ import org.apache.spark.sql.SparkSession
 import scala.collection.mutable.ArrayBuffer
 import scala.sys.process.processInternal
 import org.apache.spark.rdd.RDD 
+import scala.util.control.Breaks._
 
 import scala.collection.mutable.HashMap
 import scala.util.hashing.MurmurHash3
 import org.apache.spark.sql.catalyst.expressions.In
+import scala.util.Random
 
 object Main {
   def main(args: Array[String]): Unit = {
@@ -28,6 +30,12 @@ object Main {
 
     val minHashed = hash.buildMinHash(allShingles)
 
+    val compareMinHash = sims.compareSigMatrix(minHashed)
+
+
+    compareMinHash.foreach(e => {
+      println(e)
+    })
 
     spark.stop()
 
@@ -70,12 +78,39 @@ class CompareSets {
     val sol: Double = (inter.size.toDouble / union.size)
     return sol
   }
-
+  // - a b c 
+  // a 1
+  // b   1
+  // c     1
+  def compareSigMatrix(sigMatrix: Array[Array[Int]]): ArrayBuffer[(Int, Int, Double)] = {
+    var pairs = ArrayBuffer[(Int, Int, Double)]()
+    for (i <- Range(0, sigMatrix(0).size)) {
+      for (j <- Range(0, sigMatrix(0).size)) {
+        var sim = 0
+        for (k <- Range(0, sigMatrix.size)) {
+          if (sigMatrix(k)(i) == sigMatrix(k)(j)) {
+            sim += 1
+          }
+        }
+        var pair = (i, j, sim.toDouble / sigMatrix.size)
+        pairs += pair
+      }
+    }
+    return pairs
+  }
 }
 
 class MinHashing {
 
-  def createCharMatrix(shingles: RDD[(String, Set[Int])]): Array[Array[Int]]= {
+  def buildMinHash( shingles: RDD[(String, Set[Int])] ): Array[Array[Int]] = {
+
+    val charMatrix = createCharMatrix(shingles)
+    
+    val sigMatrix = createSigMatrix(charMatrix)
+    return sigMatrix
+  }
+
+  def createCharMatrix(shingles: RDD[(String, Set[Int])]): Array[Array[Int]] = {
     var i = 0
     var j = 0
     val arr = shingles.collect()
@@ -103,9 +138,48 @@ class MinHashing {
     return matrix
   }
 
-  def buildMinHash( shingles: RDD[(String, Set[Int])] ) = {
+  def createSigMatrix(charMatrix: Array[Array[Int]]): Array[Array[Int]] = {
+    
+    val k = 1000
+    val sigMatrix = Array.ofDim[Int](k, charMatrix(0).size)
+    var auxArray = Array(charMatrix(0).size)
+    // historyOfPermutations = []
+    // 4, 3, 1, 8, 5, ...
 
-    val matrix = createCharMatrix(shingles)
-    println(matrix)
+    
+    for(k<-Range(0, k)) {
+      // val newOrder = []
+      // for (i <- Range(0, charMatrix.size)) {
+      //   Random.nextInt(i, charMatrix.size)
+      //   newOrder.push(charMatrix[i])
+      // }
+
+      // charmatrix = [a = [...], b = [...], ...]
+      // shuffle = [b = [...], a = [...]]
+      
+      
+      val shuffle = Random.shuffle(charMatrix.toSeq)
+      auxArray = Array.fill(charMatrix(0).size)(-1)
+
+      for(i <- Range(0, charMatrix.size)){
+        breakable {
+
+            for (j <- Range(0, charMatrix(0).size)){
+              if (shuffle(i)(j) == 1 && auxArray(j) == -1) {
+                auxArray(j) = i
+              }
+            }
+            if (!(auxArray contains -1)) {
+              break
+            }
+        }
+      }
+
+      sigMatrix(k) = auxArray
+      
+    }
+    return sigMatrix
   }
+
+
 }
