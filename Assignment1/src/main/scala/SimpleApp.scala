@@ -80,7 +80,6 @@ class MinHashing {
     var j = 0
     val arr = shingles.collect()
     val shingleSet = ArrayBuffer[Int]()
-
     for (sh <- arr){
       shingleSet ++= sh._2.toArray
     }
@@ -91,14 +90,13 @@ class MinHashing {
 
     for (sh <- allShingles) {
 
-      i += 1
-
       for (file <- arr){
-        j += 1
 
         if (file._2 contains sh) matrix(i)(j) = 1
+        j += 1
 
       }
+      i += 1
       j = 0
     }
 
@@ -106,7 +104,8 @@ class MinHashing {
   }
 
   def buildMinHash( shingles: RDD[(String, Set[Int])] ) = {
+
     val matrix = createCharMatrix(shingles)
-    print(matrix)
+    println(matrix)
   }
 }
