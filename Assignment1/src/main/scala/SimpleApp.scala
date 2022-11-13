@@ -12,7 +12,8 @@ import scala.util.Random
 object Main {
   def main(args: Array[String]): Unit = {
 
-    val dir = "docs" // Should be some file on your system
+    val dir = "docs/wikipedia" // Should be some file on your system
+    val lshThreshold: Double = 0.8
     
     val spark = SparkSession.builder.appName("Simple Application").master("local[4]").getOrCreate()
 
@@ -32,10 +33,13 @@ object Main {
 
     val compareMinHash = sims.compareSigMatrix(minHashed)
 
+    var lsh = new LSH()
 
-    compareMinHash.foreach(e => {
-      println(e)
-    })
+    var candidatePairs = lsh.createLSH(minHashed, lshThreshold)
+
+    println("candidate pair amount: " + candidatePairs.length)
+
+    candidatePairs.foreach({ case (doc1, doc2) => { println("candidate pair" + doc1 + " & " + doc2) }})
 
     spark.stop()
 
@@ -140,13 +144,12 @@ class MinHashing {
 
   def createSigMatrix(charMatrix: Array[Array[Int]]): Array[Array[Int]] = {
     
-    val k = 1000
+    val k = 100
     val sigMatrix = Array.ofDim[Int](k, charMatrix(0).size)
     var auxArray = Array(charMatrix(0).size)
     // historyOfPermutations = []
     // 4, 3, 1, 8, 5, ...
 
-    
     for(k<-Range(0, k)) {
       // val newOrder = []
       // for (i <- Range(0, charMatrix.size)) {
@@ -156,7 +159,6 @@ class MinHashing {
 
       // charmatrix = [a = [...], b = [...], ...]
       // shuffle = [b = [...], a = [...]]
-      
       
       val shuffle = Random.shuffle(charMatrix.toSeq)
       auxArray = Array.fill(charMatrix(0).size)(-1)
@@ -174,12 +176,66 @@ class MinHashing {
             }
         }
       }
-
       sigMatrix(k) = auxArray
-      
     }
     return sigMatrix
   }
+}
 
+class LSH {
+  def createLSH(sigMatrix: Array[Array[Int]], threshold: Double): ArrayBuffer[(Int, Int)] = {
+    val b = 20
+    val r = sigMatrix.size / b
 
+    var candidatePairs = ArrayBuffer[(Int, Int, Int)]()
+    
+    for (bandIdx <- Range(0, b)){
+      var bucketMap = HashMap[Int, ArrayBuffer[Int]]()
+      val offset = r * bandIdx
+      val band = sigMatrix.slice(offset, offset + r)
+
+      for (i <- Range(0, sigMatrix(0).size)) {
+        var colSig = ""
+        for (j <- Range(0, band.size)) {
+          colSig += band(j)(i) 
+        }
+        val hash = MurmurHash3.stringHash(colSig)
+        val existing = bucketMap get hash
+        if (existing.isDefined) {
+          bucketMap(hash) = existing.get += i
+        } else {
+          var instance = ArrayBuffer[Int]()
+          instance = instance += i
+          bucketMap(hash) = instance 
+        }
+      }
+      // a = [1, 2, 3, 4]
+      bucketMap.foreach({ case (k, v) => {
+          if (v.size > 1) {
+            for (i <- Range(0, v.size)) {
+              for (j <- Range(i+1, v.size)) {
+                val tuple = (v(i), v(j), bandIdx)
+                candidatePairs += tuple
+              }
+            }
+          }
+        }
+      })
+    }
+    
+    val res = candidatePairs.map({ case (a, b, c) => { (a, b) } }).groupBy(identity).mapValues(_.size)
+
+    var finalCandidates = ArrayBuffer[(Int, Int)]()
+
+    res.foreach({ case ((doc1, doc2), amt) => {
+      val fraction = amt.toDouble / b
+      println("doc1/doc2 fraction: " + fraction)
+      if (fraction >= threshold) {
+        val tuple = (doc1, doc2)
+        finalCandidates += tuple
+      }
+    }})
+
+    return finalCandidates
+  }
 }
