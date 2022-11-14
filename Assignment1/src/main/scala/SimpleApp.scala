@@ -15,7 +15,7 @@ object Main {
     val dir = "docs/wikipedia" // Should be some file on your system
     val lshThreshold: Double = 0.8
     
-    val spark = SparkSession.builder.appName("Simple Application").master("local[4]").getOrCreate()
+    val spark = SparkSession.builder.appName("Simple Application").master("local[*]").getOrCreate()
 
     val rddWhole = spark.sparkContext.wholeTextFiles(dir)
 
@@ -59,7 +59,7 @@ class Shingling {
     return rddWhole.map({ case (filePath, fileContent) => {
         val set = fileContent.replace(" ", "")
           .sliding(shingleSize)
-          .map(s1 => MurmurHash3.stringHash(s1)) // [(hash), (hash)]
+          .map(s1 => MurmurHash3.stringHash(s1)) 
           .toSet
         (filePath.split("/").last, set)
     }})
@@ -86,10 +86,7 @@ class CompareSets {
     val sol: Double = (inter.size.toDouble / union.size)
     return sol
   }
-  // - a b c 
-  // a 1
-  // b   1
-  // c     1
+
   def compareSigMatrix(sigMatrix: Array[Array[Int]]): ArrayBuffer[(Int, Int, Double)] = {
     var pairs = ArrayBuffer[(Int, Int, Double)]()
     for (i <- Range(0, sigMatrix(0).size)) {
@@ -151,18 +148,8 @@ class MinHashing {
     val k = 1000
     val sigMatrix = Array.ofDim[Int](k, charMatrix(0).size)
     var auxArray = Array(charMatrix(0).size)
-    // historyOfPermutations = []
-    // 4, 3, 1, 8, 5, ...
 
     for(k<-Range(0, k)) {
-      // val newOrder = []
-      // for (i <- Range(0, charMatrix.size)) {
-      //   Random.nextInt(i, charMatrix.size)
-      //   newOrder.push(charMatrix[i])
-      // }
-
-      // charmatrix = [a = [...], b = [...], ...]
-      // shuffle = [b = [...], a = [...]]
       
       val shuffle = Random.shuffle(charMatrix.toSeq)
       auxArray = Array.fill(charMatrix(0).size)(-1)
@@ -213,7 +200,6 @@ class LSH {
           bucketMap(hash) = instance 
         }
       }
-      // a = [1, 2, 3, 4]
       bucketMap.foreach({ case (k, v) => {
           if (v.size > 1) {
             for (i <- Range(0, v.size)) {
@@ -243,3 +229,6 @@ class LSH {
     return finalCandidates
   }
 }
+
+
+// spark-submit --class "Main" --master local target/scala-2.12/simple-project_2.12-1.0.jar
