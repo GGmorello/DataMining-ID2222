@@ -27,6 +27,10 @@ object Main {
 
     val similarities = sims.computeJaccard(allShingles)
 
+    println("Jaccard Similiarities: ")
+
+    similarities.foreach(println)
+
     val hash = new MinHashing()
 
     val minHashed = hash.buildMinHash(allShingles)
@@ -35,11 +39,11 @@ object Main {
 
     var lsh = new LSH()
 
-    var candidatePairs = lsh.createLSH(minHashed, lshThreshold)
+    var matchingPairs = lsh.createLSH(minHashed, lshThreshold)
 
-    println("candidate pair amount: " + candidatePairs.length)
+    println("candidate pair amount: " + matchingPairs.length)
 
-    candidatePairs.foreach({ case (doc1, doc2) => { println("candidate pair" + doc1 + " & " + doc2) }})
+    matchingPairs.foreach({ case (doc1, doc2) => { println("candidate pair " + doc1 + " & " + doc2) }})
 
     spark.stop()
 
@@ -57,7 +61,7 @@ class Shingling {
           .sliding(shingleSize)
           .map(s1 => MurmurHash3.stringHash(s1)) // [(hash), (hash)]
           .toSet
-        (filePath, set)
+        (filePath.split("/").last, set)
     }})
   }
 }
@@ -144,7 +148,7 @@ class MinHashing {
 
   def createSigMatrix(charMatrix: Array[Array[Int]]): Array[Array[Int]] = {
     
-    val k = 100
+    val k = 1000
     val sigMatrix = Array.ofDim[Int](k, charMatrix(0).size)
     var auxArray = Array(charMatrix(0).size)
     // historyOfPermutations = []
@@ -184,7 +188,7 @@ class MinHashing {
 
 class LSH {
   def createLSH(sigMatrix: Array[Array[Int]], threshold: Double): ArrayBuffer[(Int, Int)] = {
-    val b = 20
+    val b = 200
     val r = sigMatrix.size / b
 
     var candidatePairs = ArrayBuffer[(Int, Int, Int)]()
