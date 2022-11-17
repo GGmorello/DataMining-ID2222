@@ -15,6 +15,13 @@ import scala.util.Random
 object Main {
   def main(args: Array[String]): Unit = {
     val dir = "data" // Should be some file on your system
-    println("hello world")
+
+    val spark = SparkSession.builder.appName("Frequent Itemsets Application").master("local[*]").getOrCreate()
+
+    val tranasctionRdd = spark.sparkContext.textFile(dir + "/dataset.dat")
+
+    val splitFile = tranasctionRdd.flatMap(s => s.split(" ")).collect()
+
+    splitFile.foreach(println)
   }
 }
