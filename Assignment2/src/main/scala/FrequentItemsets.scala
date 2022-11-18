@@ -32,7 +32,7 @@ object Main {
     // transaction items ID's are always ordered
     val res: ArrayBuffer[(ArrayBuffer[String], Integer)] = performKPasses(sparkContext, transactionItemsetRdd, support, k)
 
-    println("A-Priori result:")
+    println("A-Priori result: " + res.size)
     res.sortBy(x => (x._2)).foreach(println)
   }
   
