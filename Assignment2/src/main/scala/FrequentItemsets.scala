@@ -16,10 +16,10 @@ object Main {
     val dir = "data" // Should be some file on your system
 
     // how many tuple sizes we construct (passes)
-    val k = 5
+    val k = 3
     // support required for a tuple to be counted as a candidate pair
     // in each pass (occurrence support) - dataset contains 100k transactions
-    val support = 100
+    val support = 1000
 
     val spark = SparkSession.builder.appName("Frequent Itemsets Application").master("local[*]").getOrCreate()
     val sparkContext = spark.sparkContext
@@ -30,29 +30,23 @@ object Main {
     // val aPriori = new APriori()
 
     // transaction items ID's are always ordered
-    val res: ArrayBuffer[(ArrayBuffer[String], Integer)] = performKPasses(sparkContext, transactionItemsetRdd, support, k)
+    val res: ArrayBuffer[(ArrayBuffer[String], Integer)] = performKPasses(transactionItemsetRdd, support, k)
 
     println("A-Priori result: " + res.size)
     res.sortBy(x => (x._2)).foreach(println)
   }
   
   def performKPasses(
-    sparkContext: SparkContext, // TODO Might not be needed
     transactionItemsetRdd: RDD[String],
     support: Integer, k: Integer): ArrayBuffer[(ArrayBuffer[String], Integer)] = {
       var lastCandidatePairs = new ArrayBuffer[(ArrayBuffer[String], Integer)]()
-      for (ki <- Range(1, k)) {
+      for (ki <- 1 to k) {
         // we need to keep track of the single elements
         // from the last pass (ki - 1) to construct
         // new candidate pairs for the next iteration
         var singleItems: ArrayBuffer[String] = lastCandidatePairs.map({ case (k, sup) => {
           k
         }}).flatten
-
-        println("single items: " + singleItems.size)
-        println("last candidate pairs: " + lastCandidatePairs.size)
-
-        // var parallel: RDD[String] = sparkContext.parallelize(singleItems)
 
         // this will create an entry for each row (transaction) in the RDD
         // entries: (itemset, supportOfItemset)
@@ -70,12 +64,16 @@ object Main {
           }
         }).collect().to[ArrayBuffer]
 
+        println("k pass = " + ki + " finished with Lk = " + filteredTuplesLk.size + " candidate pairs")
+        println("candidate pairs/single items from previous pass: " + lastCandidatePairs.size + "/" + singleItems.size)
+
         // we might run into a scenario where we no longer find
         // any candidate pairs, so we can just return the "greatest result"
         if (filteredTuplesLk.size == 0) {
-          val max = allTuplesCk.collect().maxBy(a => a._2)
+          val res = allTuplesCk.collect()
           println("stopping at iteration k = " + ki + "; no more candidate pairs found with support s = " + support)
-          println("pair with highest support:")
+          println("pair with highest support: ")
+          val max = res.maxBy(a => a._2)
           println(max)
           return lastCandidatePairs
         }
@@ -86,49 +84,76 @@ object Main {
 
   def createKItemsets(
       transactionItems: String,
-      lastCandidatePairs: ArrayBuffer[String], // RDD[String]
+      lastCandidatePairs: ArrayBuffer[String],
       k: Integer): ArrayBuffer[(ArrayBuffer[String], Integer)] = {
-        val items: ArrayBuffer[String] = transactionItems.split(" ").to[ArrayBuffer] // separate individual ID's
+        var items: ArrayBuffer[String] = transactionItems.split(" ").to[ArrayBuffer] // separate individual ID's
+
+        // only use ID's from the previous candidate pairs
+        // to improve memory usage
+        var filteredItems = items.filter(item => {
+          if (lastCandidatePairs.size > 0) {
+            lastCandidatePairs contains item
+          } else {
+            true
+          }
+        })
 
         val allTuples = new ArrayBuffer[(ArrayBuffer[String], Integer)]()
 
         // if this transaction doesn't contain >= k items,
         // we cannot construct k-tuples, so we just return
-        if (items.size < k) {
+        if (filteredItems.size < k) {
           return allTuples
         }
 
         // we use arrays instead of tuples
         // since constructing tuples of arbitrary size
         // proved to be difficult (more straight forward with arrays)
-        for (i <- Range(0, items.size - k)) {
-            // TODO: Create itemsets based on last candidate pairs
-            var itemset = new ArrayBuffer[String]()
-            itemset += items(i)
-
-            val recursed: ArrayBuffer[String] = recurseItems(items, i + 1, k - 1)
-            itemset = itemset ++ recursed
-            allTuples += ((itemset, 1)) 
-        }
+        val itemsets: ArrayBuffer[ArrayBuffer[String]] = createItemsets(filteredItems, k)
+        itemsets.foreach(itemset => {
+          allTuples += ((itemset, 1)) 
+        })
 
         return allTuples
     }
 
-    // TODO: need to take into account recursive pairs
-    // ex. [1, 2, 3, 4] for 2-tuples only makes pairs
-    // (1, 2), (2, 3), (3, 4) - and not pairs such as (1, 3), (1, 4) and (2, 4)
-    def recurseItems(items: ArrayBuffer[String], idx: Integer, rec: Integer): ArrayBuffer[String] = {
-      var recursedItems: ArrayBuffer[String] = new ArrayBuffer[String]()
-      if (rec == 0) {
-        return recursedItems
+    def createItemsets(items: ArrayBuffer[String], k: Integer): ArrayBuffer[ArrayBuffer[String]] = {
+      return createItemsetsRec(items, 0, k)
+    }
+
+    // creates tuple pairs from items
+    // ex. [1, 2, 3, 4] for 2-tuples makes pairs
+    // (1, 2), (1, 3), (1, 4), (2, 3), (2, 4) and (3, 4)
+    def createItemsetsRec(items: ArrayBuffer[String], idx: Integer, rem: Integer): ArrayBuffer[ArrayBuffer[String]] = {
+      var allTuples: ArrayBuffer[ArrayBuffer[String]] = new ArrayBuffer[ArrayBuffer[String]]()
+      if (rem == 0 || items.size < idx + rem) {
+        return allTuples
       }
-      recursedItems += items(idx)
-      val recursed: ArrayBuffer[String] = recurseItems(items, idx + 1, rec - 1)
-      recursedItems = recursedItems ++ recursed
-      return recursedItems
+
+      // create pairs excluding current element
+      // note that if idx + 1 + rem will be larger than the size
+      // of our items, we will just append an empty array here
+      val tuplesExcludingElement: ArrayBuffer[ArrayBuffer[String]] = createItemsetsRec(items, idx + 1, rem)
+      allTuples = allTuples ++ tuplesExcludingElement
+
+      if (rem == 1) {
+        var arr = new ArrayBuffer[String]()
+        arr += items(idx)
+        allTuples += arr
+        return allTuples
+      }
+
+      // create pairs including current element
+      val tuplesIncludingElement: ArrayBuffer[ArrayBuffer[String]] = createItemsetsRec(items, idx + 1, rem - 1)
+      // each entry in "recursed" will include a permutation for rem - 1 pairs,
+      // so we construct a result for each of the entries here (including idx)
+      tuplesIncludingElement.foreach(otherItems => {
+        var tuple: ArrayBuffer[String] = new ArrayBuffer[String]()
+        tuple += items(idx)
+        tuple = tuple ++ otherItems
+        allTuples += tuple
+      })
+
+      return allTuples
     }
 }
-
-// class APriori {
-//  TODO Move implementations into this class
-// }
