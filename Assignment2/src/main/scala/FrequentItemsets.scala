@@ -20,6 +20,7 @@ object Main {
     // support required for a tuple to be counted as a candidate pair
     // in each pass (occurrence support) - dataset contains 100k transactions
     val support = 1000
+    val confidence = 0.8
 
     val spark = SparkSession.builder.appName("Frequent Itemsets Application").master("local[*]").getOrCreate()
     val sparkContext = spark.sparkContext
@@ -30,10 +31,17 @@ object Main {
     // val aPriori = new APriori()
 
     // transaction items ID's are always ordered
-    val res: ArrayBuffer[(ArrayBuffer[String], Integer)] = performKPasses(transactionItemsetRdd, support, k)
+    val candidates: ArrayBuffer[(ArrayBuffer[String], Integer)] = performKPasses(transactionItemsetRdd, support, k)
 
-    println("A-Priori result: " + res.size)
-    res.sortBy(x => (x._2)).foreach(println)
+    println("A-Priori result: " + candidates.size)
+    candidates.sortBy(x => (x._2)).foreach(println)
+
+    val allBaskets = transactionItemsetRdd.map(_.split(" ").to[ArrayBuffer]).cache()
+
+    val confident = associationRules(candidates, allBaskets, support, confidence)
+    
+    println("Confident pairs: ")
+    confident.foreach(println)
   }
   
   def performKPasses(
@@ -156,4 +164,33 @@ object Main {
 
       return allTuples
     }
+
+  def associationRules(candidates: ArrayBuffer[(ArrayBuffer[String], Integer)], sets: RDD[ArrayBuffer[String]], s: Int, c: Double): ArrayBuffer[(ArrayBuffer[String], (ArrayBuffer[String], ArrayBuffer[String]), Double)] = {
+    
+    val canBaskets = candidates.map(_._1)
+
+    val conf = new ArrayBuffer[(ArrayBuffer[String], (ArrayBuffer[String], ArrayBuffer[String]), Double)]
+
+    for (tuple <- canBaskets) {
+
+      var combs = new ArrayBuffer[ArrayBuffer[String]]
+      for (l <- Range(1, tuple.length)){
+        combs ++= tuple.combinations(l)
+      }
+      var pairs = new ArrayBuffer[(ArrayBuffer[String], ArrayBuffer[String])]
+      for (x <- combs; y <- combs) {
+        if (x.intersect(y).length == 0){
+          pairs.append((x, y))
+        }
+      }
+      for (pair <- pairs){
+        var num = sets.filter( s => (pair._1.toSet.subsetOf(s.toSet) &&  pair._2.toSet.subsetOf(s.toSet))).count
+        var den = sets.filter( s => (pair._1.toSet.subsetOf(s.toSet))).count
+        conf.append((tuple, pair, num.toDouble / den))
+      }
+    }
+    return conf.filter(_._3 > c)
+  }
+  
 }
+ 
