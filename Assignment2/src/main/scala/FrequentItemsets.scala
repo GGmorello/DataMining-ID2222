@@ -20,7 +20,7 @@ object Main {
     // support required for a tuple to be counted as a candidate pair
     // in each pass (occurrence support) - dataset contains 100k transactions
     val support = 1000
-    val confidence = 0.8
+    val confidence = 0.0
 
     val spark = SparkSession.builder.appName("Frequent Itemsets Application").master("local[*]").getOrCreate()
     val sparkContext = spark.sparkContext
@@ -179,7 +179,7 @@ object Main {
       }
       var pairs = new ArrayBuffer[(ArrayBuffer[String], ArrayBuffer[String])]
       for (x <- combs; y <- combs) {
-        if (x.intersect(y).length == 0){
+        if ((x.intersect(y).length == 0 && x.union(y).length == tuple.length)){
           pairs.append((x, y))
         }
       }
