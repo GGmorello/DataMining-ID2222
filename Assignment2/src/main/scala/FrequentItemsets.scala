@@ -19,7 +19,7 @@ object Main {
     val k = 3
     // support required for a tuple to be counted as a candidate pair
     // in each pass (occurrence support) - dataset contains 100k transactions
-    val support = 1000
+    val support = 500
     val confidence = 0.0
 
     val spark = SparkSession.builder.appName("Frequent Itemsets Application").master("local[*]").getOrCreate()
@@ -167,24 +167,24 @@ object Main {
 
   def associationRules(candidates: ArrayBuffer[(ArrayBuffer[String], Integer)], sets: RDD[ArrayBuffer[String]], s: Int, c: Double): ArrayBuffer[(ArrayBuffer[String], (ArrayBuffer[String], ArrayBuffer[String]), Double)] = {
     
-    val canBaskets = candidates.map(_._1)
-
     val conf = new ArrayBuffer[(ArrayBuffer[String], (ArrayBuffer[String], ArrayBuffer[String]), Double)]
 
-    for (tuple <- canBaskets) {
+    for ((tuple, support) <- candidates) {
 
       var combs = new ArrayBuffer[ArrayBuffer[String]]
       for (l <- Range(1, tuple.length)){
         combs ++= tuple.combinations(l)
       }
+
       var pairs = new ArrayBuffer[(ArrayBuffer[String], ArrayBuffer[String])]
       for (x <- combs; y <- combs) {
         if ((x.intersect(y).length == 0 && x.union(y).length == tuple.length)){
           pairs.append((x, y))
         }
       }
+
       for (pair <- pairs){
-        var num = sets.filter( s => (pair._1.toSet.subsetOf(s.toSet) &&  pair._2.toSet.subsetOf(s.toSet))).count
+        var num = support
         var den = sets.filter( s => (pair._1.toSet.subsetOf(s.toSet))).count
         conf.append((tuple, pair, num.toDouble / den))
       }
