@@ -10,17 +10,21 @@ import scala.util.Random
 
 // run the following commands in order
 // sbt package
-// spark-submit --class "Main" --master local target/scala-2.12/discovery-of-frequent-itemsets-project_2.12-1.0.jar
+// spark-submit --class "Main" --master local target/scala-2.12/discovery-of-frequent-itemsets-project_2.12-1.0.jar 3 1000 0.5
 object Main {
   def main(args: Array[String]): Unit = {
     val dir = "data" // Should be some file on your system
 
+    if (args.size != 3) {
+      throw new Exception("Expected 3 arguments: 'K_PASSES SUPPORT CONFIDENCE'");
+    }
+
     // how many tuple sizes we construct (passes)
-    val k = 3
+    val k: Integer = args(0).toInt
     // support required for a tuple to be counted as a candidate pair
     // in each pass (occurrence support) - dataset contains 100k transactions
-    val support = 500
-    val confidence = 0.0
+    val support: Integer = args(1).toInt
+    val confidence: Double = args(2).toDouble
 
     val spark = SparkSession.builder.appName("Frequent Itemsets Application").master("local[*]").getOrCreate()
     val sparkContext = spark.sparkContext
@@ -33,15 +37,28 @@ object Main {
     // transaction items ID's are always ordered
     val candidates: ArrayBuffer[(ArrayBuffer[String], Integer)] = performKPasses(transactionItemsetRdd, support, k)
 
-    println("A-Priori result: " + candidates.size)
-    candidates.sortBy(x => (x._2)).foreach(println)
-
     val allBaskets = transactionItemsetRdd.map(_.split(" ").to[ArrayBuffer]).cache()
 
-    val confident = associationRules(candidates, allBaskets, support, confidence)
+    val rules: ArrayBuffer[(ArrayBuffer[String], (ArrayBuffer[String], ArrayBuffer[String]), Double)] = associationRules(candidates, allBaskets, confidence)
     
-    println("Confident pairs: ")
-    confident.foreach(println)
+    println("Frequent itemsets - k: " + k + " support: " + support + " confidence: " + confidence);
+    println("A-Priori result: " + candidates.size)
+    candidates.sortBy(x => (x._2)).foreach(candidate => {
+      println("tuple: (" + candidate._1.mkString(",") + "), support: " + candidate._2);
+    });
+
+    println();
+    println("Association rules: ")
+    rules.foreach(item => {
+      val tuple = "tuple: (" + item._1.mkString(",") + ") ";
+      print(tuple); // frequent itemset I
+      val subsetA = item._2._1.mkString(",");
+      print("rule: [" + subsetA + "] -> "); // subset A of I
+      val subsetIA = item._2._2.mkString(",");
+      print("[" + subsetIA + "]"); // subset A w/o items in I
+      print("; confidence: " + item._3);
+      println();
+    });
   }
   
   def performKPasses(
@@ -165,7 +182,7 @@ object Main {
       return allTuples
     }
 
-  def associationRules(candidates: ArrayBuffer[(ArrayBuffer[String], Integer)], sets: RDD[ArrayBuffer[String]], s: Int, c: Double): ArrayBuffer[(ArrayBuffer[String], (ArrayBuffer[String], ArrayBuffer[String]), Double)] = {
+  def associationRules(candidates: ArrayBuffer[(ArrayBuffer[String], Integer)], sets: RDD[ArrayBuffer[String]], c: Double): ArrayBuffer[(ArrayBuffer[String], (ArrayBuffer[String], ArrayBuffer[String]), Double)] = {
     
     val conf = new ArrayBuffer[(ArrayBuffer[String], (ArrayBuffer[String], ArrayBuffer[String]), Double)]
 
@@ -185,7 +202,7 @@ object Main {
 
       for (pair <- pairs){
         var num = support
-        var den = sets.filter( s => (pair._1.toSet.subsetOf(s.toSet))).count
+        var den = sets.filter(s => (pair._1.toSet.subsetOf(s.toSet))).count
         conf.append((tuple, pair, num.toDouble / den))
       }
     }
