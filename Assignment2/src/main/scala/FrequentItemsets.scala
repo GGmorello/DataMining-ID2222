@@ -20,7 +20,7 @@ object Main {
     }
 
     // how many tuple sizes we construct (passes)
-    val k: Integer = args(0).toInt
+    val tupleSize: Integer = args(0).toInt
     // support required for a tuple to be counted as a candidate pair
     // in each pass (occurrence support) - dataset contains 100k transactions
     val support: Integer = args(1).toInt
@@ -35,13 +35,17 @@ object Main {
     // val aPriori = new APriori()
 
     // transaction items ID's are always ordered
-    val candidates: ArrayBuffer[(ArrayBuffer[String], Integer)] = performKPasses(transactionItemsetRdd, support, k)
+    val candidates = new ArrayBuffer[(ArrayBuffer[String], Integer)]
+
+    for (k <- 1 to tupleSize) {
+      candidates ++= performKPasses(transactionItemsetRdd, support, k)
+    }
 
     val allBaskets = transactionItemsetRdd.map(_.split(" ").to[ArrayBuffer]).cache()
 
     val rules: ArrayBuffer[(ArrayBuffer[String], (ArrayBuffer[String], ArrayBuffer[String]), Double)] = associationRules(candidates, allBaskets, confidence)
     
-    println("Frequent itemsets - k: " + k + " support: " + support + " confidence: " + confidence);
+    //println("Frequent itemsets - k: " + k + " support: " + support + " confidence: " + confidence);
     println("A-Priori result: " + candidates.size)
     candidates.sortBy(x => (x._2)).foreach(candidate => {
       println("tuple: (" + candidate._1.mkString(",") + "), support: " + candidate._2);
