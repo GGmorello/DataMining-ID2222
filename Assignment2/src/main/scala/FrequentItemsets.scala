@@ -34,42 +34,48 @@ object Main {
     // (got serialization exception if using separate class)
     // val aPriori = new APriori()
 
-    // transaction items ID's are always ordered
-    val candidates = new ArrayBuffer[(ArrayBuffer[String], Integer)]
-
+    var lastCandidatePairs = new ArrayBuffer[(ArrayBuffer[String], Integer)]()
     for (k <- 1 to tupleSize) {
-      candidates ++= performKPasses(transactionItemsetRdd, support, k)
+      val candidates: ArrayBuffer[(ArrayBuffer[String], Integer)] = performKPasses(lastCandidatePairs, transactionItemsetRdd, support, k)
+
+      lastCandidatePairs = candidates
+
+      if (k == 1) {
+        println("Frequent itemsets - k: " + k + " support: " + support + " confidence: " + confidence);
+        println("A-Priori result: " + candidates.size)
+        println("Not printing all candidates or calculating association rules for pass k = 1");
+      } else {
+        val allBaskets = transactionItemsetRdd.map(_.split(" ").to[ArrayBuffer]).cache()
+
+        val rules: ArrayBuffer[(ArrayBuffer[String], (ArrayBuffer[String], ArrayBuffer[String]), Double)] = associationRules(candidates, allBaskets, confidence)      
+
+        println("Frequent itemsets - k: " + k + " support: " + support + " confidence: " + confidence);
+        println("A-Priori result: " + candidates.size)
+        candidates.sortBy(x => (x._2)).foreach(candidate => {
+          println("tuple: (" + candidate._1.mkString(",") + "), support: " + candidate._2);
+        });
+        println();
+        println("Association rules: ")
+        rules.foreach(item => {
+          val tuple = "tuple: (" + item._1.mkString(",") + ") ";
+          print(tuple); // frequent itemset I
+          val subsetA = item._2._1.mkString(",");
+          print("rule: [" + subsetA + "] -> "); // subset A of I
+          val subsetIA = item._2._2.mkString(",");
+          print("[" + subsetIA + "]"); // subset A w/o items in I
+          print("; confidence: " + item._3);
+          println();
+        });
+      }
+      
     }
-
-    val allBaskets = transactionItemsetRdd.map(_.split(" ").to[ArrayBuffer]).cache()
-
-    val rules: ArrayBuffer[(ArrayBuffer[String], (ArrayBuffer[String], ArrayBuffer[String]), Double)] = associationRules(candidates, allBaskets, confidence)
     
-    //println("Frequent itemsets - k: " + k + " support: " + support + " confidence: " + confidence);
-    println("A-Priori result: " + candidates.size)
-    candidates.sortBy(x => (x._2)).foreach(candidate => {
-      println("tuple: (" + candidate._1.mkString(",") + "), support: " + candidate._2);
-    });
-
-    println();
-    println("Association rules: ")
-    rules.foreach(item => {
-      val tuple = "tuple: (" + item._1.mkString(",") + ") ";
-      print(tuple); // frequent itemset I
-      val subsetA = item._2._1.mkString(",");
-      print("rule: [" + subsetA + "] -> "); // subset A of I
-      val subsetIA = item._2._2.mkString(",");
-      print("[" + subsetIA + "]"); // subset A w/o items in I
-      print("; confidence: " + item._3);
-      println();
-    });
   }
   
   def performKPasses(
+    lastCandidatePairs: ArrayBuffer[(ArrayBuffer[String], Integer)],
     transactionItemsetRdd: RDD[String],
-    support: Integer, k: Integer): ArrayBuffer[(ArrayBuffer[String], Integer)] = {
-      var lastCandidatePairs = new ArrayBuffer[(ArrayBuffer[String], Integer)]()
-      for (ki <- 1 to k) {
+    support: Integer, ki: Integer): ArrayBuffer[(ArrayBuffer[String], Integer)] = {
         // we need to keep track of the single elements
         // from the last pass (ki - 1) to construct
         // new candidate pairs for the next iteration
@@ -93,9 +99,6 @@ object Main {
           }
         }).collect().to[ArrayBuffer]
 
-        println("k pass = " + ki + " finished with Lk = " + filteredTuplesLk.size + " candidate pairs")
-        println("candidate pairs/single items from previous pass: " + lastCandidatePairs.size + "/" + singleItems.size)
-
         // we might run into a scenario where we no longer find
         // any candidate pairs, so we can just return the "greatest result"
         if (filteredTuplesLk.size == 0) {
@@ -106,9 +109,7 @@ object Main {
           println(max)
           return lastCandidatePairs
         }
-        lastCandidatePairs = filteredTuplesLk
-      }
-      return lastCandidatePairs
+        return filteredTuplesLk
   }
 
   def createKItemsets(
