@@ -21,15 +21,15 @@ import scala.util.Random
 // spark-submit --class "Main" --master local target/scala-2.12/mining-data-streams-project_2.12-1.0.jar
 object Main {
   def main(args: Array[String]): Unit = {
+    val rand = new scala.util.Random
     val dir = "data" // Should be some file on your system
     val spark = SparkSession.builder.appName("Frequent Itemsets Application").master("local[*]").getOrCreate()
     val sparkContext = spark.sparkContext
     val rawGraph = sparkContext.textFile(dir + "/edges_and_op.txt").cache()
 
     val graph = rawGraph.map(_.split(" ")).map{case Array(f1,f2,f3) => (f1.toInt, f2.toInt, f3)}.collect.toArray
-    
-    val M = 10
-    var t = 0
+    val M = 1000
+    var t: Long = 0
     var s = 0
     var di = 0
     var d0 = 0
@@ -40,6 +40,8 @@ object Main {
     var globalCounter = 0
     var localCounters = scala.collection.mutable.Map[Int, Int]()
     
+    var estimation = BigDecimal(0.0)
+
     for ((u,v,op) <- graph) {
       t += 1
       if (op == "+") {
@@ -51,40 +53,45 @@ object Main {
         s -= 1
         if (S.contains((u,v))) {
           updateCounters(op, (u,v), S, adjList)
+          removeEdge((u,v), S, adjList)
           di += 1
         } else {
-          updateCounters(op, (u,v), S, adjList)
-          S -= ((u,v))
           d0 += 1
         }
       }
     }
 
+    println(globalCounter)
+    estimation = estimate(globalCounter, s, S, M, di, d0)
+    println("Estimation:")
+    println(estimation)
+
 
     def sampleEdge(edge: (Int, Int), op: String, S: ArrayBuffer[(Int, Int)], adjList: Map[Int, Set[Int]]): Boolean = {
+      var ret = false
       if (d0 + di == 0) {
         if (S.size < M) {
           addEdge(edge, S, adjList)
-          return true
-        } else if (scala.util.Random.nextDouble < M/t.toDouble){
-          var chosen = S(scala.util.Random.nextInt(S.length))
+          ret = true
+        } else if (rand.nextDouble() < (M.toDouble/t)) {
+          var chosen = S(rand.nextInt(S.length))
           updateCounters(op, chosen, S, adjList)
           removeEdge(chosen, S, adjList)
           addEdge(edge, S, adjList)
-          return true
+          ret = true
         }
-      } else if (scala.util.Random.nextDouble < M/t.toDouble) {
+
+      } else if (rand.nextDouble() < di.toDouble/(di+d0)) {
         addEdge(edge, S, adjList)
         di -= 1
-        return true
+        ret = true
       } else {
         d0 -= 1
-        return false
+        ret = false
       }
+      return ret
     }
 
-    // operation = + or -
-    // TODO include graph S
     def updateCounters(op: String, edge: (Int, Int), S: ArrayBuffer[(Int, Int)], adjList: Map[Int, Set[Int]]) = {
       val u = edge._1
       val v = edge._2
@@ -95,17 +102,17 @@ object Main {
           if (localCounters.contains(u)) {
             localCounters(u) += 1
           } else {
-            localCounters += (u -> 0)
+            localCounters += (u -> 1)
           }
           if (localCounters.contains(v)) {
             localCounters(v) += 1
           } else {
-            localCounters += (v -> 0)
+            localCounters += (v -> 1)
           }         
           if (localCounters.contains(common)) {
             localCounters(common) += 1
           } else {
-            localCounters += (common -> 0)
+            localCounters += (common -> 1)
           }
         } else {
           globalCounter -= 1
@@ -133,33 +140,84 @@ object Main {
       // 21: tu <- tu op 1
       // 22: tv <- tv op 1
     }
+
+    def addEdge(edge: (Int, Int), S: ArrayBuffer[(Int, Int)], adjList: Map[Int, Set[Int]]) = {
+      val u = edge._1
+      val v = edge._2
+      if (adjList contains u){
+        adjList(u) += v
+      } else {
+        adjList += (u -> Set(v))
+      }
+      if (adjList contains v){
+        adjList(v) += u
+      } else {
+        adjList += (v -> Set(u))
+      }
+      S += edge
+    }
+
+    def removeEdge(edge: (Int, Int), S: ArrayBuffer[(Int, Int)], adjList: Map[Int, Set[Int]]) = {
+      val u = edge._1
+      val v = edge._2
+      adjList(u) -= v
+      adjList(v) -= u
+      if(adjList(u).isEmpty) {
+        adjList -= u
+      }
+      if(adjList(v).isEmpty) {
+        adjList -= v
+      }
+      S -= edge
+    }
   }
 
-  def addEdge(edge: (Int, Int), S: ArrayBuffer[(Int, Int)], adjList: Map[Int, Set[Int]]) = {
-    val u = edge._1
-    val v = edge._2
-    if (S contains edge){
-      adjList(u) += v
-      adjList(v) += u
+  def estimate(globalCounter: Int, s: Int, S: ArrayBuffer[(Int, Int)], M: Int, di: Int, d0: Int): BigDecimal = {
+    val tau = globalCounter
+    val Mt = S.size
+    val kappa = findKappa(M, s, di, d0)
+    var ret = BigDecimal(0)
+    if (Mt < 3) {
+      ret = 0
     } else {
-      adjList += (u -> Set(v), v -> Set(u))
+      ret = tau / kappa * (s * (s-1) * (s-2)) / ( Mt * (Mt-1) * (Mt-2))
     }
-    S += edge
+    return ret
   }
 
-  def removeEdge(edge: (Int, Int), S: ArrayBuffer[(Int, Int)], adjList: Map[Int, Set[Int]]) = {
-    val u = edge._1
-    val v = edge._2
-    adjList(u) -= v
-    adjList(v) -= u
-    if(adjList(u).isEmpty) {
-      adjList -= u
+  def findKappa(M: Int, s: Int, di: Int, d0: Int): BigDecimal = {
+    val omega = scala.math.min(M, s + di + d0)
+    var p = BigDecimal(0.0)
+    var hyper = BigDecimal(0)
+    for (j <- 0 to 2) {
+      hyper = hypergeometric(s+di+d0, s, omega, j)
+      p += hyper
     }
-    if(adjList(u).isEmpty) {
-      adjList -= v
-    }
-    S -= edge
+    return 1 - p
   }
+
+  def binCoef(n: Int, k: Int): BigDecimal = {
+
+    def permutations(n: Int): BigDecimal =
+      (1 to n).map(BigDecimal(_)).foldLeft(BigDecimal(1))(_ * _)
+
+    def combinations(n: Int, k: Int): BigDecimal =
+      permutations(n) / (permutations(k) * permutations(n - k))
+    
+    def fact(n: Int) : Int = (1 to n).product
+
+    println(combinations(n, k))
+    combinations(n, k)
+  }
+  
+  def hypergeometric(N: Int, K: Int, n: Int, k: Int): BigDecimal = {
+    println(N, K, n, k)
+    binCoef(K, k) * binCoef(N - K, n - k) / binCoef(N, n)
+  }
+
+
+
+  
   // TODO include graph S, M, 
 
       /*
@@ -199,5 +257,4 @@ object Main {
     query.awaitTermination()
     println(S)
         */  
-
 }
