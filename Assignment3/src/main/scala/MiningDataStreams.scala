@@ -18,7 +18,7 @@ import scala.util.Random
 
 // run the following commands in order
 // sbt package
-// spark-submit --class "Main" --master local target/scala-2.12/mining-data-streams-project_2.12-1.0.jar
+// spark-submit --class "Main" --master local target/scala-2.12/mining-data-streams-project_2.12-1.0.jar 1000
 object Main {
   def main(args: Array[String]): Unit = {
     val rand = new scala.util.Random
@@ -28,7 +28,7 @@ object Main {
     val rawGraph = sparkContext.textFile(dir + "/edges_and_op.txt").cache()
 
     val graph = rawGraph.map(_.split(" ")).map{case Array(f1,f2,f3) => (f1.toInt, f2.toInt, f3)}.collect.toArray
-    val M = 1000
+    val M = args(0).toInt
     var t: Long = 0
     var s = 0
     var di = 0
@@ -52,7 +52,7 @@ object Main {
       } else if (op == "-"){
         s -= 1
         if (S.contains((u,v))) {
-          updateCounters(op, (u,v), S, adjList)
+          updateCounters("+", (u,v), S, adjList)
           removeEdge((u,v), S, adjList)
           di += 1
         } else {
@@ -75,7 +75,7 @@ object Main {
           ret = true
         } else if (rand.nextDouble() < (M.toDouble/t)) {
           var chosen = S(rand.nextInt(S.length))
-          updateCounters(op, chosen, S, adjList)
+          updateCounters("-", chosen, S, adjList)
           removeEdge(chosen, S, adjList)
           addEdge(edge, S, adjList)
           ret = true
@@ -174,15 +174,18 @@ object Main {
 
   def estimate(globalCounter: Int, s: Int, S: ArrayBuffer[(Int, Int)], M: Int, di: Int, d0: Int): BigDecimal = {
     val tau = globalCounter
-    val Mt = S.size
+    val Mt = S.size.toDouble
     val kappa = findKappa(M, s, di, d0)
     var ret = BigDecimal(0)
+    var p = 0.0
     if (Mt < 3) {
       ret = 0
     } else {
-      ret = tau / kappa * (s * (s-1) * (s-2)) / ( Mt * (Mt-1) * (Mt-2))
+      p = (Mt/s) * ((Mt-1) / (s-1)) * ((Mt-2) / (s-2))
+      //ret = (tau / kappa) * (s * (s-1) * (s-2)) / ( Mt * (Mt-1) * (Mt-2))
     }
-    return ret
+    println(Mt, s, p)
+    tau / p
   }
 
   def findKappa(M: Int, s: Int, di: Int, d0: Int): BigDecimal = {
@@ -190,9 +193,12 @@ object Main {
     var p = BigDecimal(0.0)
     var hyper = BigDecimal(0)
     for (j <- 0 to 2) {
-      hyper = hypergeometric(s+di+d0, s, omega, j)
-      p += hyper
+      if (j >= scala.math.max(0, omega - di - d0)  && j <= scala.math.min(omega, s)) {
+        hyper = hypergeometric(s+di+d0, s, omega, j)
+        p += hyper
+      }
     }
+    println(p)
     return 1 - p
   }
 
