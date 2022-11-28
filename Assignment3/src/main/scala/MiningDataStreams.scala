@@ -47,12 +47,12 @@ object Main {
       if (op == "+") {
         s += 1
         if (sampleEdge((u,v), op, S, adjList)) {
-          updateCounters(op, (u,v), S, adjList)
+          updateCounters("+", (u,v), S, adjList)
         }
       } else if (op == "-"){
         s -= 1
         if (S.contains((u,v))) {
-          updateCounters("+", (u,v), S, adjList)
+          updateCounters("-", (u,v), S, adjList)
           removeEdge((u,v), S, adjList)
           di += 1
         } else {
