@@ -25,7 +25,7 @@ object Main {
     val dir = "data" // Should be some file on your system
     val spark = SparkSession.builder.appName("Frequent Itemsets Application").master("local[*]").getOrCreate()
     val sparkContext = spark.sparkContext
-    val rawGraph = sparkContext.textFile(dir + "/edges_and_op.txt").cache()
+    val rawGraph = sparkContext.textFile(dir + "/+_-.txt").cache()
 
     val graph = rawGraph.map(_.split(" ")).map{case Array(f1,f2,f3) => (f1.toInt, f2.toInt, f3)}.collect.toArray
     val M = args(0).toInt
@@ -61,7 +61,6 @@ object Main {
       }
     }
 
-    println(globalCounter)
     estimation = estimate(globalCounter, s, S, M, di, d0)
     println("Estimation:")
     println(estimation)
@@ -172,20 +171,20 @@ object Main {
     }
   }
 
-  def estimate(globalCounter: Int, s: Int, S: ArrayBuffer[(Int, Int)], M: Int, di: Int, d0: Int): BigDecimal = {
+  def estimate(globalCounter: Int, s1: Int, S: ArrayBuffer[(Int, Int)], M: Int, di: Int, d0: Int): BigDecimal = {
     val tau = globalCounter
     val Mt = S.size.toDouble
-    val kappa = findKappa(M, s, di, d0)
-    var ret = BigDecimal(0)
+    val kappa = findKappa(M, s1, di, d0).toDouble
+    var ret = 0.0
     var p = 0.0
+    val s: Long = s1
     if (Mt < 3) {
-      ret = 0
+      ret = 0.0
     } else {
-      p = (Mt/s) * ((Mt-1) / (s-1)) * ((Mt-2) / (s-2))
-      //ret = (tau / kappa) * (s * (s-1) * (s-2)) / ( Mt * (Mt-1) * (Mt-2))
+      ret = (tau / kappa) * (s * (s-1) * (s-2)) / ( Mt * (Mt-1) * (Mt-2))
     }
-    println(Mt, s, p)
-    tau / p
+    println(Mt, s, kappa, tau, ret)
+    ret
   }
 
   def findKappa(M: Int, s: Int, di: Int, d0: Int): BigDecimal = {
