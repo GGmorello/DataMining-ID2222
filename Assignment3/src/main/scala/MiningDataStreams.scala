@@ -18,14 +18,17 @@ import scala.util.Random
 
 // run the following commands in order
 // sbt package
-// spark-submit --class "Main" --master local target/scala-2.12/mining-data-streams-project_2.12-1.0.jar 1000
+// spark-submit --class "Main" --master local target/scala-2.12/mining-data-streams-project_2.12-1.0.jar 5000 +_-.txt
+// spark-submit --class "Main" --master local target/scala-2.12/mining-data-streams-project_2.12-1.0.jar 5000 skips.txt
+// spark-submit --class "Main" --master local target/scala-2.12/mining-data-streams-project_2.12-1.0.jar 5000 edges_and_op.txt
 object Main {
   def main(args: Array[String]): Unit = {
     val rand = new scala.util.Random
     val dir = "data" // Should be some file on your system
     val spark = SparkSession.builder.appName("Frequent Itemsets Application").master("local[*]").getOrCreate()
     val sparkContext = spark.sparkContext
-    val rawGraph = sparkContext.textFile(dir + "/+_-.txt").cache()
+    var filename = args(1)
+    val rawGraph = sparkContext.textFile(dir + "/" + filename).cache()
 
     val graph = rawGraph.map(_.split(" ")).map{case Array(f1,f2,f3) => (f1.toInt, f2.toInt, f3)}.collect.toArray
     val M = args(0).toInt
@@ -49,7 +52,7 @@ object Main {
         if (sampleEdge((u,v), op, S, adjList)) {
           updateCounters("+", (u,v), S, adjList)
         }
-      } else if (op == "-"){
+      } else if (op == "-") {
         s -= 1
         if (S.contains((u,v))) {
           updateCounters("-", (u,v), S, adjList)
@@ -183,7 +186,7 @@ object Main {
     } else {
       ret = (tau / kappa) * (s * (s-1) * (s-2)) / ( Mt * (Mt-1) * (Mt-2))
     }
-    println(Mt, s, kappa, tau, ret)
+    println("Mt/s/kappa/tau/ret", Mt, s, kappa, tau, ret)
     ret
   }
 
