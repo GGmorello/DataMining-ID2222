@@ -15,7 +15,7 @@ gr = graph(col1, col2);
 adj = adjacency(gr);   
 
 figure(1)
-
+plot(gr)
 
 A = full(adj); 
 figure(2)
