@@ -16,9 +16,12 @@ public class JabejaTask2 {
   private final HashMap<Integer, Node> entireGraph;
   private final List<Integer> nodeIds;
   private int numberOfSwaps;
+  private int restartAtRound = -1;
   private int round;
+  private float alpha;
   private float beta;
   private float T; // 0 to 1
+  private final float ORIGINAL_T;
   private float Tmin = (float) 0.00001; // min value for T
   private boolean resultFileCreated = false;
 
@@ -30,6 +33,9 @@ public class JabejaTask2 {
     this.numberOfSwaps = 0;
     this.config = config;
     this.T = 1;
+    this.ORIGINAL_T = 1;
+    // TODO: is alpha necessary or not?
+    this.alpha = config.getAlpha();
     this.beta = config.getBeta();
   }
 
@@ -53,8 +59,21 @@ public class JabejaTask2 {
   private void saCoolDown() {
     if (T >= Tmin) {
       T *= beta;
-    } else
+    } else {
       T = Tmin;
+      if (restartAtRound == -1) {
+        logger.info("T arrived at Tmin on round: " + round);
+        // wait a bit before restarting the annealing
+        // restartAtRound = round + 100;
+        // restartAtRound = (int) Math.floor(round * 1.5);
+        restartAtRound = (int) Math.floor(round * 2);
+        logger.info("Restarting annealing at round: " + restartAtRound);
+      } else if (restartAtRound <= round) {
+        logger.info("Restarting annealing now: " + round);
+        T = ORIGINAL_T;
+        restartAtRound = -1;
+      }
+    }
   }
 
   /**
@@ -91,35 +110,61 @@ public class JabejaTask2 {
   public Node findPartner(int nodeId, Integer[] nodes) {
     Node nodep = entireGraph.get(nodeId);
 
+    Node bestPartner = null;
+    double highestBenefit = 0;
+
     for (Integer node : nodes) {
       Node q = entireGraph.get(node);
 
-      float acceptanceProbability = calculateCostAndAcceptanceProbability(nodep, q);
-      if (acceptanceProbability > RandNoGenerator.nextFloat()) {
-        return q;
+      Double oldCost = calculateCost(nodep, q, false);
+      Double newCost = calculateCost(nodep, q, true);
+      float acceptanceProbability = calculateAcceptanceProbability(oldCost, newCost, highestBenefit);
+      float nextRand = RandNoGenerator.nextFloat();
+      // we want to make a swap when 3 cases are true:
+      // 1. The oldCost is not the same as newCost (avoid duplicate swaps):
+      //    - !oldCost.equals(newCost)
+      // 2. The acceptance probability is higher than the random number:
+      //    - acceptanceProbability > nextRand
+      // 3. We make sure to take the highest benefit swap:
+      //    - acceptanceProbability > highestBenefit 
+
+      // The last point is important in order to get a optimal solution -
+      // since we might have scenarios where we have a clear improvement (newCost is high),
+      // but we replace it since the acceptanceProbabiltity happens to be higher
+      // than the random value we generate. In such scenarios, we want to make sure
+      // that the higher value wins, so we compare the acceptanceProbability > highestBenefit here
+      if (acceptanceProbability > nextRand && !oldCost.equals(newCost) && acceptanceProbability > highestBenefit) {
+        // logger.info("Acceptance probability: " + oldCost + "; " + newCost + "; " + acceptanceProbability + "; " + nextRand);
+        bestPartner = q;
+        highestBenefit = acceptanceProbability;
       }
     }
 
-    return null;
+    return bestPartner;
   }
 
-  private float calculateCostAndAcceptanceProbability(Node nodep, Node nodeq) {
-    Integer degreeNodepp = getDegree(nodep, nodep.getColor());
-    Integer degreeNodeqq = getDegree(nodeq, nodeq.getColor());
+  private Double calculateCost(Node nodep, Node nodeq, boolean swap) {
+    int nodepColor = nodep.getColor();
+    int nodeqColor = nodeq.getColor();
 
-    Integer oldVal = degreeNodepp + degreeNodeqq;
+    Integer degreeNodepp = getDegree(nodep, swap ? nodeqColor : nodepColor);
+    Integer degreeNodeqq = getDegree(nodeq, swap ? nodepColor : nodeqColor);
 
-    Integer degreeNodepq = getDegree(nodep, nodeq.getColor());
-    Integer degreeNodeqp = getDegree(nodeq, nodep.getColor());
+    Double val = Math.pow(Double.valueOf(degreeNodepp), alpha) + Math.pow(Double.valueOf(degreeNodeqq), alpha);
+    return val;
+  }
 
-    Integer newVal = degreeNodepq + degreeNodeqp;
-
-    if (newVal < oldVal) {
-      //System.out.println("Swap nodep/nodeq (newVal < oldVal): " + newVal + "; " + oldVal + "; " + T);
+  private float calculateAcceptanceProbability(Double oldCost, Double newCost, Double highest) {
+    // always swap when newVal is greater than oldVal
+    if (newCost > oldCost && newCost > highest) {
+      // System.out.println("Swap nodep/nodeq (newVal < oldVal): " + newVal + "; " + oldVal + "; " + T);
+      // TODO: make acceptance probability higher the bigger the difference between values?
       return (float) 1.0;
     } else {
-      //System.out.println("Swap nodep/nodeq (newVal >= oldVal): " + newVal + "; " + oldVal + "; " + T);
-      return T;
+      // sometimes make a swap even though newVal is worse than oldVal - to avoid local optimas
+      // System.out.println("Dont swap nodep/nodeq (newVal >= oldVal): " + newVal + "; " + oldVal + "; " + T);
+      double a = Math.exp((newCost - oldCost) / T);
+      return (float) a;
     }
   }
 

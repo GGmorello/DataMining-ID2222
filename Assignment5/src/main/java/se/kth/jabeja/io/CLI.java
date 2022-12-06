@@ -31,16 +31,16 @@ public class CLI {
   @Option(name = "-temp", usage = "Simulated annealing temperature.")
   private float TEMPERATURE = 2;
 
-  @Option(name = "-delta", usage = "Simulated annealing delta.")
+  @Option(name = "-delta", usage = "Simulated annealing delta, used in task 1. Beta is used in task 2.")
   private float DELTA = (float) 0.003;
 
   @Option(name = "-seed", usage = "Seed.")
   private int SEED = 0;
 
-  @Option(name = "-alpha", usage = "Alpah parameter")
+  @Option(name = "-alpha", usage = "Alpha parameter")
   private float ALPHA = 2;
 
-  @Option(name ="-beta", usage = "Beta parmeter for task 2")
+  @Option(name ="-beta", usage = "Simulated annealing beta, used in task 2")
   private float BETA = (float) 0.9;
 
   @Option(name = "-randNeighborsSampleSize", usage = "Number of random neighbors sample size.")

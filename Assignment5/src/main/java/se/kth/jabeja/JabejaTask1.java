@@ -17,7 +17,10 @@ public class JabejaTask1 {
   private final List<Integer> nodeIds;
   private int numberOfSwaps;
   private int round;
+  private int restartAtRound = -1;
   private float alpha;
+  private final float delta;
+  private final float ORIGINAL_T;
   private float T;
   private boolean resultFileCreated = false;
 
@@ -28,8 +31,10 @@ public class JabejaTask1 {
     this.round = 0;
     this.numberOfSwaps = 0;
     this.config = config;
+    this.ORIGINAL_T = config.getTemperature();
     this.T = config.getTemperature();
     this.alpha = config.getAlpha();
+    this.delta = config.getDelta();
   }
 
   // -------------------------------------------------------------------
@@ -50,11 +55,24 @@ public class JabejaTask1 {
    * Simulated analealing cooling function
    */
   private void saCoolDown() {
-    // TODO for second task
     if (T > 1)
-      T -= config.getDelta();
-    if (T < 1)
+      T -= delta;
+    if (T <= 1) {
+      // we want to restart the annealing process after a certain amount of rounds
+      // to see how it impacts the end result
       T = 1;
+      if (restartAtRound == -1) {
+        // wait a bit before restarting the annealing
+        restartAtRound = round + 100;
+        // restartAtRound = (int) Math.floor(round * 1.5);
+        // restartAtRound = (int) Math.floor(round * 2);
+        logger.info("Restarting annealing at round: " + restartAtRound);
+      } else if (restartAtRound <= round) {
+        logger.info("Restarting annealing now: " + round);
+        T = ORIGINAL_T;
+        restartAtRound = -1;
+      }
+    }
   }
 
   /**
