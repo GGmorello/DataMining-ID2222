@@ -13,7 +13,7 @@ import java.util.*;
 public class Jabeja {
   final static Logger logger = Logger.getLogger(Jabeja.class);
   private final Config config;
-  private final HashMap<Integer/*id*/, Node/*neighbors*/> entireGraph;
+  private final HashMap<Integer, Node> entireGraph;
   private final List<Integer> nodeIds;
   private int numberOfSwaps;
   private int round;
@@ -68,12 +68,17 @@ public class Jabeja {
             || config.getNodeSelectionPolicy() == NodeSelectionPolicy.LOCAL) {
       // swap with random neighbors
       // TODO
+      ArrayList<Integer> neighbors = nodep.getNeighbours();
+      Integer[] arr = new Integer[neighbors.size()]; 
+      neighbors.toArray(arr);
+      partner = findPartner(nodeId, arr);
     }
 
     if (config.getNodeSelectionPolicy() == NodeSelectionPolicy.HYBRID
             || config.getNodeSelectionPolicy() == NodeSelectionPolicy.RANDOM) {
       // if local policy fails then randomly sample the entire graph
       // TODO
+      
     }
 
     // swap the colors
