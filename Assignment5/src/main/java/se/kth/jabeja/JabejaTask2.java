@@ -10,25 +10,27 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
-public class Jabeja {
-  final static Logger logger = Logger.getLogger(Jabeja.class);
+public class JabejaTask2 {
+  final static Logger logger = Logger.getLogger(JabejaTask2.class);
   private final Config config;
   private final HashMap<Integer, Node> entireGraph;
   private final List<Integer> nodeIds;
   private int numberOfSwaps;
   private int round;
-  private int alpha = 2;
-  private float T;
+  private float beta;
+  private float T; // 0 to 1
+  private float Tmin = (float) 0.00001; // min value for T
   private boolean resultFileCreated = false;
 
   // -------------------------------------------------------------------
-  public Jabeja(HashMap<Integer, Node> graph, Config config) {
+  public JabejaTask2(HashMap<Integer, Node> graph, Config config) {
     this.entireGraph = graph;
     this.nodeIds = new ArrayList(entireGraph.keySet());
     this.round = 0;
     this.numberOfSwaps = 0;
     this.config = config;
-    this.T = config.getTemperature();
+    this.T = 1;
+    this.beta = config.getBeta();
   }
 
   // -------------------------------------------------------------------
@@ -49,11 +51,10 @@ public class Jabeja {
    * Simulated analealing cooling function
    */
   private void saCoolDown() {
-    // TODO for second task
-    if (T > 1)
-      T -= config.getDelta();
-    if (T < 1)
-      T = 1;
+    if (T >= Tmin) {
+      T *= beta;
+    } else
+      T = Tmin;
   }
 
   /**
@@ -88,29 +89,38 @@ public class Jabeja {
   }
 
   public Node findPartner(int nodeId, Integer[] nodes) {
-
     Node nodep = entireGraph.get(nodeId);
-
-    Node bestPartner = null;
-    double highestBenefit = 0;
 
     for (Integer node : nodes) {
       Node q = entireGraph.get(node);
 
-      Integer degreeNodepp = getDegree(nodep, nodep.getColor());
-      Integer degreeNodeqq = getDegree(q, q.getColor());
-      Double old = Math.pow(Double.valueOf(degreeNodepp), alpha) + Math.pow(Double.valueOf(degreeNodeqq), alpha);
-      Integer degreeNodepq = getDegree(nodep, q.getColor());
-      Integer degreeNodeqp = getDegree(q, nodep.getColor());
-      Double newVal = Math.pow(Double.valueOf(degreeNodepq), alpha) + Math.pow(Double.valueOf(degreeNodeqp), alpha);
-
-      if (newVal * T > old && (newVal > highestBenefit)) {
-        bestPartner = q;
-        highestBenefit = newVal;
+      float acceptanceProbability = calculateCostAndAcceptanceProbability(nodep, q);
+      if (acceptanceProbability > RandNoGenerator.nextFloat()) {
+        return q;
       }
     }
 
-    return bestPartner;
+    return null;
+  }
+
+  private float calculateCostAndAcceptanceProbability(Node nodep, Node nodeq) {
+    Integer degreeNodepp = getDegree(nodep, nodep.getColor());
+    Integer degreeNodeqq = getDegree(nodeq, nodeq.getColor());
+
+    Integer oldVal = degreeNodepp + degreeNodeqq;
+
+    Integer degreeNodepq = getDegree(nodep, nodeq.getColor());
+    Integer degreeNodeqp = getDegree(nodeq, nodep.getColor());
+
+    Integer newVal = degreeNodepq + degreeNodeqp;
+
+    if (newVal < oldVal) {
+      //System.out.println("Swap nodep/nodeq (newVal < oldVal): " + newVal + "; " + oldVal + "; " + T);
+      return (float) 1.0;
+    } else {
+      //System.out.println("Swap nodep/nodeq (newVal >= oldVal): " + newVal + "; " + oldVal + "; " + T);
+      return T;
+    }
   }
 
   /**

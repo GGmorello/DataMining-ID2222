@@ -13,9 +13,21 @@ public class Config {
   private GraphInitColorPolicy initColorPolicy;
   private NodeSelectionPolicy nodeSelectionPolicy;
   private Float alpha;
+  private Float beta;
+  private int version;
 
   public Config setAlpha(Float alpha) {
     this.alpha = alpha;
+    return this;
+  }
+
+  public Config setBeta(Float beta) {
+    this.beta = beta;
+    return this;
+  }
+
+  public Config setVersion(int v) {
+    this.version = v;
     return this;
   }
 
@@ -156,6 +168,16 @@ public class Config {
     if (alpha == null) {
     }
     return alpha;
+  }
+
+  public Float getBeta() {
+    if(beta == null) {
+    }
+    return beta;
+  }
+
+  public int getVersion() {
+    return this.version;
   }
 
   public Config createJabejaConfig() {

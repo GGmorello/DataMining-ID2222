@@ -40,6 +40,9 @@ public class CLI {
   @Option(name = "-alpha", usage = "Alpah parameter")
   private float ALPHA = 2;
 
+  @Option(name ="-beta", usage = "Beta parmeter for task 2")
+  private float BETA = (float) 0.9;
+
   @Option(name = "-randNeighborsSampleSize", usage = "Number of random neighbors sample size.")
   private int randNeighborsSampleSize = 3;
 
@@ -56,6 +59,9 @@ public class CLI {
 
   @Option(name = "-outputDir", usage = "Location of the output file(s)")
   private static String OUTPUT_DIR = "./output";
+
+  @Option(name = "-version", usage = "Version of JaBeJa to use - 1 or 2")
+  private static int VERSION;
 
   public Config parseArgs(String[] args) throws FileNotFoundException {
     CmdLineParser parser = new CmdLineParser(this);
@@ -101,6 +107,8 @@ public class CLI {
 
     return new Config().setRandNeighborsSampleSize(randNeighborsSampleSize)
             .setDelta(DELTA)
+            .setBeta(BETA)
+            .setVersion(VERSION)
             .setNumPartitions(NUM_PARTITIONS)
             .setUniformRandSampleSize(UNIFORM_RAND_SAMPLE_SIZE)
             .setRounds(ROUNDS)

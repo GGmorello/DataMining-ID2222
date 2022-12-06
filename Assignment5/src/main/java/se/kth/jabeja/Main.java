@@ -37,7 +37,7 @@ public class Main {
         HashMap<Integer, Node> graph = readGraph();
 
         //start JaBeJa
-        startJabeja(graph);
+        startJabeja(graph, config.getVersion());
     }
 
     /**
@@ -57,8 +57,13 @@ public class Main {
      * @param graph
      * @return
      */
-    private void startJabeja(HashMap<Integer, Node> graph) throws IOException {
-        Jabeja host = new Jabeja(graph, config);
-        host.startJabeja();
+    private void startJabeja(HashMap<Integer, Node> graph, int version) throws IOException {
+        if (version == 1) {
+            JabejaTask1 host = new JabejaTask1(graph, config);
+            host.startJabeja();
+        } else {
+            JabejaTask2 host = new JabejaTask2(graph, config);
+            host.startJabeja();
+        }
     }
 }
