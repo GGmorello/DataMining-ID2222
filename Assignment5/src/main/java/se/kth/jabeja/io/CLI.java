@@ -41,7 +41,7 @@ public class CLI {
   private float ALPHA = 2;
 
   @Option(name ="-beta", usage = "Simulated annealing beta, used in task 2")
-  private float BETA = (float) 0.8;
+  private float BETA = (float) 0.9;
 
   @Option(name = "-customannealing", usage = "Use custom annealing function or the one provided, used in task 2.")
   private boolean CUSTOM_ANNEALING = false;
