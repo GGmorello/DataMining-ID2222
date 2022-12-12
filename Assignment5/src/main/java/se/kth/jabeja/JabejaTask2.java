@@ -111,32 +111,36 @@ public class JabejaTask2 {
     Node nodep = entireGraph.get(nodeId);
 
     Node bestPartner = null;
-    double highestBenefit = 0;
+    double highestDegree = 0;
 
     for (Integer node : nodes) {
       Node q = entireGraph.get(node);
 
-      Double oldCost = calculateCost(nodep, q, false);
-      Double newCost = calculateCost(nodep, q, true);
-      float acceptanceProbability = calculateAcceptanceProbability(oldCost, newCost, highestBenefit);
+      Double oldDegree = calculateCost(nodep, q, false);
+      Double newDegree = calculateCost(nodep, q, true);
+      // float acceptanceProbability = calculateAcceptanceProbability(oldDegree, newDegree, highestBenefit);
+      float acceptanceProbability = calculateAcceptanceProbabilityCustom(oldDegree, newDegree, highestDegree);
       float nextRand = RandNoGenerator.nextFloat();
       // we want to make a swap when 3 cases are true:
       // 1. The oldCost is not the same as newCost (avoid duplicate swaps):
-      //    - !oldCost.equals(newCost)
+      // - !oldCost.equals(newCost)
       // 2. The acceptance probability is higher than the random number:
-      //    - acceptanceProbability > nextRand
+      // - acceptanceProbability > nextRand
       // 3. We make sure to take the highest benefit swap:
-      //    - acceptanceProbability > highestBenefit 
+      // - acceptanceProbability > highestBenefit
 
       // The last point is important in order to get a optimal solution -
-      // since we might have scenarios where we have a clear improvement (newCost is high),
+      // since we might have scenarios where we have a clear improvement (newCost is
+      // high),
       // but we replace it since the acceptanceProbabiltity happens to be higher
       // than the random value we generate. In such scenarios, we want to make sure
-      // that the higher value wins, so we compare the acceptanceProbability > highestBenefit here
-      if (acceptanceProbability > nextRand && !oldCost.equals(newCost) && acceptanceProbability > highestBenefit) {
-        // logger.info("Acceptance probability: " + oldCost + "; " + newCost + "; " + acceptanceProbability + "; " + nextRand);
+      // that the higher value wins, so we compare the acceptanceProbability >
+      // highestBenefit here
+      if (acceptanceProbability > nextRand && !oldDegree.equals(newDegree)) {
+        // logger.info("Acceptance probability: " + oldCost + "; " + newCost + "; " +
+        // acceptanceProbability + "; " + nextRand);
         bestPartner = q;
-        highestBenefit = acceptanceProbability;
+        highestDegree = newDegree;
       }
     }
 
@@ -154,18 +158,35 @@ public class JabejaTask2 {
     return val;
   }
 
-  private float calculateAcceptanceProbability(Double oldCost, Double newCost, Double highest) {
+  private float calculateAcceptanceProbability(Double oldDegree, Double newDegree, Double highestDegree) {
     // always swap when newVal is greater than oldVal
-    if (newCost > oldCost && newCost > highest) {
-      // System.out.println("Swap nodep/nodeq (newVal < oldVal): " + newVal + "; " + oldVal + "; " + T);
-      // TODO: make acceptance probability higher the bigger the difference between values?
-      return (float) 1.0;
+    if (newDegree > oldDegree) {
+      if (newDegree > highestDegree) {
+        return (float) 1.0;
+      } else {
+        double a = Math.exp((oldDegree - newDegree) / T);
+        return (float) a;
+      }
     } else {
-      // sometimes make a swap even though newVal is worse than oldVal - to avoid local optimas
-      // System.out.println("Dont swap nodep/nodeq (newVal >= oldVal): " + newVal + "; " + oldVal + "; " + T);
-      double a = Math.exp((newCost - oldCost) / T);
+      // sometimes make a swap even though newVal is worse than oldVal - to avoid
+      // local optimas
+      double a = Math.exp((newDegree - oldDegree) / T);
       return (float) a;
     }
+  }
+
+  // 1. If newDegree > oldDegree, make a swap
+  //  1.1 If newDegree < highestDegree, reduce probability
+  // 2. If newDegree < oldDegree, sometimes make a swap
+  private float calculateAcceptanceProbabilityCustom(Double oldDegree, Double newDegree, Double highestDegree) {
+    // always swap when newVal is greater than oldVal
+    // also keep track of the highest degree encountered so far
+    if (newDegree > oldDegree && newDegree > highestDegree) {
+      return (float) 1.0;
+    }
+    double x = Math.abs(newDegree - oldDegree);
+    double ap = 1/(x*(1-T)+1);
+    return (float) ap;
   }
 
   /**
