@@ -41,7 +41,10 @@ public class CLI {
   private float ALPHA = 2;
 
   @Option(name ="-beta", usage = "Simulated annealing beta, used in task 2")
-  private float BETA = (float) 0.9;
+  private float BETA = (float) 0.8;
+
+  @Option(name = "-customannealing", usage = "Use custom annealing function or the one provided, used in task 2.")
+  private boolean CUSTOM_ANNEALING = false;
 
   @Option(name = "-randNeighborsSampleSize", usage = "Number of random neighbors sample size.")
   private int randNeighborsSampleSize = 3;
@@ -108,6 +111,7 @@ public class CLI {
     return new Config().setRandNeighborsSampleSize(randNeighborsSampleSize)
             .setDelta(DELTA)
             .setBeta(BETA)
+            .setUseCustomAnnealing(CUSTOM_ANNEALING)
             .setVersion(VERSION)
             .setNumPartitions(NUM_PARTITIONS)
             .setUniformRandSampleSize(UNIFORM_RAND_SAMPLE_SIZE)

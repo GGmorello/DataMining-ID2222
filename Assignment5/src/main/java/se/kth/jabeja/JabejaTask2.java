@@ -23,6 +23,7 @@ public class JabejaTask2 {
   private float T; // 0 to 1
   private final float ORIGINAL_T;
   private float Tmin = (float) 0.00001; // min value for T
+  private boolean useCustomAnnealing = false;
   private boolean resultFileCreated = false;
 
   // -------------------------------------------------------------------
@@ -34,9 +35,9 @@ public class JabejaTask2 {
     this.config = config;
     this.T = 1;
     this.ORIGINAL_T = 1;
-    // TODO: is alpha necessary or not?
     this.alpha = config.getAlpha();
     this.beta = config.getBeta();
+    this.useCustomAnnealing = config.getUseCustomAnnealing();
   }
 
   // -------------------------------------------------------------------
@@ -118,8 +119,12 @@ public class JabejaTask2 {
 
       Double oldDegree = calculateCost(nodep, q, false);
       Double newDegree = calculateCost(nodep, q, true);
-      // float acceptanceProbability = calculateAcceptanceProbability(oldDegree, newDegree, highestBenefit);
-      float acceptanceProbability = calculateAcceptanceProbabilityCustom(oldDegree, newDegree, highestDegree);
+      float acceptanceProbability = (float) 0.0;
+      if (useCustomAnnealing) {
+        acceptanceProbability = calculateCustomAcceptanceProbability(oldDegree, newDegree, highestDegree);
+      } else {
+        acceptanceProbability = calculateAcceptanceProbability(oldDegree, newDegree, highestDegree);
+      }
       float nextRand = RandNoGenerator.nextFloat();
       // we want to make a swap when 3 cases are true:
       // 1. The oldCost is not the same as newCost (avoid duplicate swaps):
@@ -178,7 +183,7 @@ public class JabejaTask2 {
   // 1. If newDegree > oldDegree, make a swap
   //  1.1 If newDegree < highestDegree, reduce probability
   // 2. If newDegree < oldDegree, sometimes make a swap
-  private float calculateAcceptanceProbabilityCustom(Double oldDegree, Double newDegree, Double highestDegree) {
+  private float calculateCustomAcceptanceProbability(Double oldDegree, Double newDegree, Double highestDegree) {
     // always swap when newVal is greater than oldVal
     // also keep track of the highest degree encountered so far
     if (newDegree > oldDegree && newDegree > highestDegree) {

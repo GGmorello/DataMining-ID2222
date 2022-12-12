@@ -15,6 +15,7 @@ public class Config {
   private Float alpha;
   private Float beta;
   private int version;
+  private boolean useCustomAnnealing;
 
   public Config setAlpha(Float alpha) {
     this.alpha = alpha;
@@ -83,6 +84,11 @@ public class Config {
 
   public Config setUniformRandSampleSize(Integer rnd_list_size) {
     this.uniformRandomSampleSize = rnd_list_size;
+    return this;
+  }
+
+  public Config setUseCustomAnnealing(boolean useCustomAnnealing) {
+    this.useCustomAnnealing = useCustomAnnealing;
     return this;
   }
 
@@ -174,6 +180,10 @@ public class Config {
     if(beta == null) {
     }
     return beta;
+  }
+
+  public boolean getUseCustomAnnealing() {
+    return useCustomAnnealing;
   }
 
   public int getVersion() {
